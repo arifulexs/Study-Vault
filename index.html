@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StudyVault</title>
+  <meta name="description" content="Organize your class links, papers and topics. Sync across all devices."/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#070b14"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ═══════════════════════════════════
+       AUTH SCREEN
+  ═══════════════════════════════════ -->
+  <div id="authScreen" class="auth-screen" style="display:none">
+    <div class="auth-bg"></div>
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+          <rect width="52" height="52" rx="14" fill="#5b8af5" opacity="0.12"/>
+          <path d="M12 38V16a2 2 0 012-2h24a2 2 0 012 2v22" stroke="#5b8af5" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M10 38h32" stroke="#5b8af5" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M20 14v24M32 14v24" stroke="#5b8af5" stroke-width="1.4" stroke-linecap="round" opacity="0.4"/>
+          <path d="M14 22h4M14 28h4M34 22h4M34 28h4" stroke="#5b8af5" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 class="auth-title">StudyVault</h1>
+      <p class="auth-sub">Organize class links by subject and paper.<br/>Sync seamlessly across all your devices.</p>
+
+      <button id="googleSignInBtn" class="btn-google">
+        <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <button id="guestBtn" class="btn-guest">Continue without signing in</button>
+
+      <p class="auth-note">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Syncs across devices when signed in · Free forever
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       MAIN APP
+  ═══════════════════════════════════ -->
+  <div id="app" style="display:none">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="backBtn" class="icon-btn" aria-label="Go back" style="visibility:hidden">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="title-wrap">
+          <div id="pageTitle" class="page-title">StudyVault</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Search -->
+        <div class="search-wrap">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="search" placeholder="Search topics…" autocomplete="off" aria-label="Search topics"/>
+        </div>
+
+        <!-- Sync status -->
+        <button id="syncBtn" class="icon-btn sync-btn" aria-label="Sync status" title="Sync status">
+          <svg id="syncIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+        </button>
+
+        <!-- Export -->
+        <button id="exportBtn" class="icon-btn" title="Export data as JSON" aria-label="Export data">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+
+        <!-- Import -->
+        <label class="icon-btn" for="importFile" title="Import JSON backup" aria-label="Import data" tabindex="0" role="button" onkeydown="if(event.key==='Enter')this.click()">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </label>
+        <input type="file" id="importFile" accept=".json" style="display:none" aria-hidden="true"/>
+
+        <!-- Theme toggle -->
+        <button id="themeToggle" class="icon-btn" title="Toggle light/dark theme" aria-label="Toggle theme">
+          <svg id="themeIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+
+        <!-- User menu -->
+        <div class="user-area">
+          <button id="userMenuBtn" class="user-menu-btn" aria-label="User menu" aria-expanded="false" aria-haspopup="true">
+            <img id="userAvatar" class="user-avatar" src="" alt="" style="display:none"/>
+            <div id="userInitials" class="user-initials">G</div>
+          </button>
+          <div id="userDropdown" class="user-dropdown" role="menu" aria-hidden="true">
+            <div class="user-info">
+              <div id="dropdownName" class="dropdown-name">Guest</div>
+              <div id="dropdownEmail" class="dropdown-email">Not signed in</div>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button id="signInFromApp" class="dropdown-item" role="menuitem">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+              Sign in with Google
+            </button>
+            <button id="signOutBtn" class="dropdown-item" role="menuitem" style="display:none">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Loading bar -->
+    <div id="loadingBar" class="loading-bar" aria-hidden="true"></div>
+
+    <!-- Content -->
+    <main id="contentArea" class="content" aria-live="polite"></main>
+
+    <!-- FAB -->
+    <button id="fabBtn" class="fab" aria-label="Add new item" style="display:none">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+  </div><!-- /#app -->
+
+
+  <!-- ═══════════════════════════════════
+       MODALS
+  ═══════════════════════════════════ -->
+
+  <!-- Topic Modal -->
+  <div id="topicModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle" class="modal-title">Add Topic</h2>
+        <button class="icon-btn modal-close" data-modal="topicModal" aria-label="Close dialog">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="topicForm" novalidate>
+        <input type="hidden" id="topicId"/>
+        <div class="field-group">
+          <label for="topicTitle">Topic Title</label>
+          <input type="text" id="topicTitle" placeholder="e.g. Measurement" autocomplete="off" maxlength="120"/>
+          <span id="topicTitleError" class="error-msg" role="alert"></span>
+        </div>
+        <div class="field-group">
+          <label for="topicUrl">Class Link (URL)</label>
+          <input type="url" id="topicUrl" placeholder="https://meet.google.com/…"/>
+          <span id="topicUrlError" class="error-msg" role="alert"></span>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelModalBtn" class="btn secondary">Cancel</button>
+          <button type="submit" id="saveTopicBtn" class="btn primary">Save Topic</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="modal-header">
+        <h2 id="confirmTitle" class="modal-title">Confirm Delete</h2>
+      </div>
+      <p id="confirmMsg" class="confirm-msg"></p>
+      <div class="modal-actions">
+        <button id="confirmCancel" class="btn secondary">Cancel</button>
+        <button id="confirmOk" class="btn danger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Topic menu portal (renders above everything, avoids overflow clipping) -->
+  <div id="topic-menu-portal" style="position:fixed;z-index:9999;top:0;left:0;pointer-events:none;"></div>
+
+  <!-- Add/Edit Subject Modal -->
+  <div id="subjectModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">
+      <div class="modal-header">
+        <h2 id="subjectModalTitle" class="modal-title">Add Subject</h2>
+        <button class="icon-btn modal-close" data-modal="subjectModal" aria-label="Close dialog">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="field-group">
+        <label for="subjectName">Subject Name</label>
+        <input type="text" id="subjectName" placeholder="e.g. Physics" autocomplete="off" maxlength="60"/>
+        <span id="subjectNameError" class="error-msg" role="alert"></span>
+      </div>
+      <div class="field-group">
+        <label>Choose Icon &amp; Color</label>
+        <div id="iconPicker" class="icon-picker" role="radiogroup" aria-label="Subject icon"></div>
+      </div>
+      <div class="field-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="subjectDirect" style="accent-color:var(--accent);width:16px;height:16px"/>
+          <span>Direct topic list <span style="color:var(--text3);font-weight:400">(no papers, like ICT)</span></span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelSubjectBtn" class="btn secondary">Cancel</button>
+        <button id="saveSubjectBtn" class="btn primary">Add Subject</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Paper Modal -->
+  <div id="paperModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="paperModalTitle">
+      <div class="modal-header">
+        <h2 id="paperModalTitle" class="modal-title">Add Paper</h2>
+        <button class="icon-btn modal-close" data-modal="paperModal" aria-label="Close dialog">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="field-group">
+        <label for="paperName">Paper Name</label>
+        <input type="text" id="paperName" placeholder="e.g. 1st Paper" autocomplete="off" maxlength="60"/>
+        <span id="paperNameError" class="error-msg" role="alert"></span>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelPaperBtn" class="btn secondary">Cancel</button>
+        <button id="savePaperBtn" class="btn primary">Add Paper</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- localForage CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <!-- Main app (ES module for Firebase) -->
+  <script type="module" src="script.js"></script>
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW:', err));
+      });
+    }
+  </script>
+</body>
+</html>
