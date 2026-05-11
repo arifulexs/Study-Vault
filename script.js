@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════
-// STUDYVAULT — script.js  (final clean version)
-// Firebase Google Auth + Firestore  |  free tier
-// Offline-first via localForage  |  no backend
+// STUDYVAULT — script.js
+// Firebase Google Auth + Firestore | free tier
+// Storage: localStorage (no CDN dependency, always works)
 // ═══════════════════════════════════════════════════
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -14,12 +14,12 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot }
 // Replace with your own values from console.firebase.google.com
 // Leave as-is to run in offline-only mode (no sign-in required)
 const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyBcnT3-BFJr5C_1jfdJvqoKWfwjEEN15KY",
-  authDomain:        "studyvault-f775d.firebaseapp.com",
-  projectId:         "studyvault-f775d",
-  storageBucket:     "studyvault-f775d.firebasestorage.app",
-  messagingSenderId: "636451122016",
-  appId:             "1:636451122016:web:d604285d72e1bcde254c05"
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 
 // ── FIREBASE INIT ──────────────────────────────────
@@ -32,13 +32,18 @@ function firebaseReady() {
   return FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
 }
 if (firebaseReady()) {
-  fbApp = initializeApp(FIREBASE_CONFIG);
-  auth  = getAuth(fbApp);
-  db    = getFirestore(fbApp);
+  try {
+    fbApp = initializeApp(FIREBASE_CONFIG);
+    auth  = getAuth(fbApp);
+    db    = getFirestore(fbApp);
+  } catch (e) {
+    console.error('[StudyVault] Firebase init failed:', e);
+  }
 }
 
 // ── CONSTANTS ──────────────────────────────────────
-const STORAGE_KEY = 'studyvault-data-v1';
+// Version bump (v2) forces fresh data load and clears any old v1 format
+const STORAGE_KEY = 'studyvault-data-v2';
 const THEME_KEY   = 'studyvault-theme';
 
 const SUBJECT_COLORS = [
@@ -66,27 +71,74 @@ const SUBJECT_ICONS = [
 ];
 
 // ── UTILS ──────────────────────────────────────────
-function uid()  { return 'i' + Math.random().toString(36).slice(2, 10); }
+function uid() { return 'i' + Math.random().toString(36).slice(2, 10); }
 function esc(t) {
   return String(t)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── SAMPLE DATA ────────────────────────────────────
 function makeSample() {
   return {
     subjects: {
-      "Physics":   { _colorIdx:0, _iconKey:'zap',        papers:{ "1st Paper":[{ id:uid(), title:"Measurement",            url:"https://example.com/physics-measurement" },{ id:uid(), title:"Motion in a Straight Line", url:"https://example.com/physics-motion"      }], "2nd Paper":[{ id:uid(), title:"Electricity & Circuits", url:"https://example.com/physics-electricity" }] } },
-      "Chemistry": { _colorIdx:1, _iconKey:'flask',       papers:{ "1st Paper":[{ id:uid(), title:"Periodic Table",         url:"https://example.com/chem-periodic"       },{ id:uid(), title:"Chemical Bonding",          url:"https://example.com/chem-bonding"        }], "2nd Paper":[{ id:uid(), title:"Organic Reactions",      url:"https://example.com/chem-organic"       }] } },
-      "H.Math":    { _colorIdx:2, _iconKey:'calculator',  papers:{ "1st Paper":[{ id:uid(), title:"Straight Lines",          url:"https://example.com/hmath-lines"         },{ id:uid(), title:"Circles",                  url:"https://example.com/hmath-circles"       }], "2nd Paper":[{ id:uid(), title:"Differentiation",        url:"https://example.com/hmath-diff"         }] } },
-      "Biology":   { _colorIdx:3, _iconKey:'leaf',        papers:{ "1st Paper":[{ id:uid(), title:"Cell Biology",            url:"https://example.com/bio-cell"            },{ id:uid(), title:"Genetics",                 url:"https://example.com/bio-genetics"        }], "2nd Paper":[{ id:uid(), title:"কোষ ও এর গঠন",          url:"https://example.com/bio-cell-structure"  }] } },
-      "ICT":       { _colorIdx:5, _iconKey:'cpu', _direct:true, topics:[
-        { id:uid(), title:"Number System",       url:"https://example.com/ict-number-system" },
-        { id:uid(), title:"Database Management", url:"https://example.com/ict-database"      },
-        { id:uid(), title:"Web Design Basics",   url:"https://example.com/ict-webdesign"     },
-        { id:uid(), title:"Spreadsheet",         url:"https://example.com/ict-spreadsheet"   },
-      ]},
+      "Physics":   {
+        _colorIdx: 0, _iconKey: 'zap',
+        papers: {
+          "1st Paper": [
+            { id: uid(), title: "Measurement",            url: "https://example.com/physics-measurement" },
+            { id: uid(), title: "Motion in a Straight Line", url: "https://example.com/physics-motion" }
+          ],
+          "2nd Paper": [
+            { id: uid(), title: "Electricity & Circuits", url: "https://example.com/physics-electricity" }
+          ]
+        }
+      },
+      "Chemistry": {
+        _colorIdx: 1, _iconKey: 'flask',
+        papers: {
+          "1st Paper": [
+            { id: uid(), title: "Periodic Table",   url: "https://example.com/chem-periodic" },
+            { id: uid(), title: "Chemical Bonding", url: "https://example.com/chem-bonding" }
+          ],
+          "2nd Paper": [
+            { id: uid(), title: "Organic Reactions", url: "https://example.com/chem-organic" }
+          ]
+        }
+      },
+      "H.Math":    {
+        _colorIdx: 2, _iconKey: 'calculator',
+        papers: {
+          "1st Paper": [
+            { id: uid(), title: "Straight Lines", url: "https://example.com/hmath-lines" },
+            { id: uid(), title: "Circles",        url: "https://example.com/hmath-circles" }
+          ],
+          "2nd Paper": [
+            { id: uid(), title: "Differentiation", url: "https://example.com/hmath-diff" }
+          ]
+        }
+      },
+      "Biology":   {
+        _colorIdx: 3, _iconKey: 'leaf',
+        papers: {
+          "1st Paper": [
+            { id: uid(), title: "Cell Biology", url: "https://example.com/bio-cell" },
+            { id: uid(), title: "Genetics",     url: "https://example.com/bio-genetics" }
+          ],
+          "2nd Paper": [
+            { id: uid(), title: "কোষ ও এর গঠন", url: "https://example.com/bio-cell-structure" }
+          ]
+        }
+      },
+      "ICT": {
+        _colorIdx: 5, _iconKey: 'cpu', _direct: true,
+        topics: [
+          { id: uid(), title: "Number System",       url: "https://example.com/ict-number-system" },
+          { id: uid(), title: "Database Management", url: "https://example.com/ict-database" },
+          { id: uid(), title: "Web Design Basics",   url: "https://example.com/ict-webdesign" },
+          { id: uid(), title: "Spreadsheet",         url: "https://example.com/ict-spreadsheet" }
+        ]
+      }
     }
   };
 }
@@ -94,12 +146,36 @@ function makeSample() {
 // ── STATE ──────────────────────────────────────────
 const state = {
   data:        null,
-  view:        'subjects',   // subjects | papers | topics | search
+  view:        'subjects',
   subject:     null,
-  paper:       null,         // null means either home or direct subject (no papers)
+  paper:       null,   // null = home view OR direct subject (no papers)
   searchQuery: '',
   dragSrc:     null,
 };
+
+// ── STORAGE — plain localStorage ──────────────────
+// No CDN dependency, synchronous, always available.
+function storageSave(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[StudyVault] localStorage save failed:', e);
+  }
+}
+
+function storageLoad() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Validate: must have a subjects object
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.subjects !== 'object') return null;
+    return parsed;
+  } catch (e) {
+    console.warn('[StudyVault] localStorage load failed:', e);
+    return null;
+  }
+}
 
 // ── COUNTS ────────────────────────────────────────
 function countTopics(data) {
@@ -125,25 +201,29 @@ function getIconSvg(name) {
   return found ? found.svg : SUBJECT_ICONS[getColorIdx(name) % SUBJECT_ICONS.length].svg;
 }
 
-// ── LOCAL STORAGE (IndexedDB via localForage) ──────
-localforage.config({ name: 'StudyVault', storeName: 'data' });
-
-async function localLoad() {
-  let d = await localforage.getItem(STORAGE_KEY);
-  if (!d) { d = makeSample(); await localforage.setItem(STORAGE_KEY, d); }
-  if (!d.subjects) d.subjects = {};
-  return d;
+// ── LOAD & SAVE ────────────────────────────────────
+function loadData() {
+  const d = storageLoad();
+  return d || makeSample();
 }
-async function localSave(data) {
-  await localforage.setItem(STORAGE_KEY, data);
+
+async function save() {
+  storageSave(state.data);
+  if (currentUser && firebaseReady() && db) schedulePush();
 }
 
 // ── FIREBASE SYNC ─────────────────────────────────
 function setSyncState(s) {
-  const btn = $('#syncBtn');
+  const btn = document.getElementById('syncBtn');
+  if (!btn) return;
   btn.classList.remove('syncing', 'synced', 'offline', 'error');
   btn.classList.add(s);
-  const labels = { syncing:'Syncing…', synced:'All changes saved', offline:'Offline — syncs when connected', error:'Sync error' };
+  const labels = {
+    syncing: 'Syncing…',
+    synced:  'All changes saved',
+    offline: 'Offline — syncs when connected',
+    error:   'Sync error'
+  };
   btn.title = labels[s] || '';
 }
 
@@ -153,7 +233,10 @@ async function pushToFirestore(data) {
   try {
     await setDoc(doc(db, 'users', currentUser.uid), { data: JSON.stringify(data) });
     setSyncState('synced');
-  } catch (e) { console.error('Firestore write:', e); setSyncState('error'); }
+  } catch (e) {
+    console.error('Firestore write:', e);
+    setSyncState('error');
+  }
 }
 
 function schedulePush() {
@@ -168,66 +251,83 @@ async function pullFromFirestore() {
     const snap = await getDoc(doc(db, 'users', currentUser.uid));
     if (snap.exists()) {
       const remote = JSON.parse(snap.data().data);
-      state.data = remote;
-      await localSave(remote);
-      setSyncState('synced');
-      render();
-      showToast('Synced from cloud', 'success');
-    } else {
-      setSyncState('synced');
+      if (remote && remote.subjects) {
+        state.data = remote;
+        storageSave(remote);
+        setSyncState('synced');
+        render();
+        showToast('Synced from cloud', 'success');
+        return;
+      }
     }
-  } catch (e) { console.error('Firestore read:', e); setSyncState('error'); }
+    setSyncState('synced');
+  } catch (e) {
+    console.error('Firestore read:', e);
+    setSyncState('error');
+  }
 }
 
 function subscribeFirestore() {
   if (!firebaseReady() || !currentUser || !db) return;
   if (unsubFirestore) unsubFirestore();
-  unsubFirestore = onSnapshot(doc(db, 'users', currentUser.uid), snap => {
-    if (snap.exists()) {
-      const remote = JSON.parse(snap.data().data);
-      if (JSON.stringify(remote) !== JSON.stringify(state.data)) {
-        state.data = remote; localSave(remote); render();
-      }
-    }
-  }, err => { console.warn('Firestore listener:', err); setSyncState('error'); });
-}
-
-async function save() {
-  await localSave(state.data);
-  if (currentUser && firebaseReady()) schedulePush();
+  unsubFirestore = onSnapshot(
+    doc(db, 'users', currentUser.uid),
+    snap => {
+      if (!snap.exists()) return;
+      try {
+        const remote = JSON.parse(snap.data().data);
+        if (remote && remote.subjects && JSON.stringify(remote) !== JSON.stringify(state.data)) {
+          state.data = remote;
+          storageSave(remote);
+          render();
+        }
+      } catch (e) { console.warn('Firestore parse error:', e); }
+    },
+    err => { console.warn('Firestore listener:', err); setSyncState('error'); }
+  );
 }
 
 // ── DOM HELPERS ────────────────────────────────────
 const $ = (s, ctx = document) => ctx.querySelector(s);
 const $$ = (s, ctx = document) => [...ctx.querySelectorAll(s)];
 
-function showLoading(on) { $('#loadingBar').classList.toggle('active', on); }
+function showLoading(on) {
+  const bar = document.getElementById('loadingBar');
+  if (bar) bar.classList.toggle('active', on);
+}
 
 function openModal(id) {
-  const m = $('#' + id);
+  const m = document.getElementById(id);
+  if (!m) return;
   m.classList.add('open');
   m.setAttribute('aria-hidden', 'false');
   setTimeout(() => {
-    const f = m.querySelector('input:not([type=hidden]):not([type=checkbox]), button.btn.primary');
+    const f = m.querySelector('input:not([type=hidden]):not([type=checkbox])');
     if (f) f.focus();
   }, 80);
 }
 function closeModal(id) {
-  const m = $('#' + id);
+  const m = document.getElementById(id);
+  if (!m) return;
   m.classList.remove('open');
   m.setAttribute('aria-hidden', 'true');
 }
 function closeAllModals() {
-  $$('.modal-overlay').forEach(m => { m.classList.remove('open'); m.setAttribute('aria-hidden', 'true'); });
+  $$('.modal-overlay').forEach(m => {
+    m.classList.remove('open');
+    m.setAttribute('aria-hidden', 'true');
+  });
 }
 
 // ── TOAST ─────────────────────────────────────────
 function showToast(msg, type = 'info', ms = 3000) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
   const t = document.createElement('div');
   t.className = `toast toast-${type}`;
   t.innerHTML = `<span class="toast-dot"></span><span>${esc(msg)}</span><button class="toast-close" aria-label="Dismiss">×</button>`;
   t.querySelector('.toast-close').onclick = () => removeToast(t);
-  $('#toast-container').appendChild(t);
+  container.appendChild(t);
   setTimeout(() => removeToast(t), ms);
 }
 function removeToast(t) {
@@ -237,8 +337,8 @@ function removeToast(t) {
 }
 
 // ── RENDER DISPATCHER ─────────────────────────────
-// FIX: topics view with paper===null means direct subject → renderDirectTopics
 function render() {
+  if (!state.data) return;
   if (state.view === 'subjects') return renderSubjects();
   if (state.view === 'papers')   return renderPapers(state.subject);
   if (state.view === 'topics')   return state.paper !== null
@@ -248,29 +348,32 @@ function render() {
 }
 
 // ── TOPBAR HELPERS ─────────────────────────────────
-function setTitle(t) { $('#pageTitle').textContent = t; }
-function showBack(on) { $('#backBtn').style.visibility = on ? 'visible' : 'hidden'; }
+function setTitle(t) {
+  const el = document.getElementById('pageTitle');
+  if (el) el.textContent = t;
+}
+function showBack(on) {
+  const el = document.getElementById('backBtn');
+  if (el) el.style.visibility = on ? 'visible' : 'hidden';
+}
 function setFab(show, onClick) {
-  const fab = $('#fabBtn');
+  const fab = document.getElementById('fabBtn');
+  if (!fab) return;
   fab.style.display = show ? 'flex' : 'none';
   fab.onclick = onClick || null;
 }
 
 // ── BODY BREADCRUMB ────────────────────────────────
-// Called right after area.innerHTML = '' so it's the first child.
-// All non-last crumbs are clickable buttons.
 function buildBreadcrumb(area, segments) {
   if (!segments || segments.length === 0) return;
   const nav = document.createElement('nav');
   nav.className = 'body-breadcrumb';
   nav.setAttribute('aria-label', 'Breadcrumb');
-
   segments.forEach((seg, i) => {
     const isLast = i === segments.length - 1;
     const span   = document.createElement('span');
-    span.className  = 'crumb' + (isLast ? ' active' : '');
+    span.className   = 'crumb' + (isLast ? ' active' : '');
     span.textContent = seg.label;
-
     if (!isLast && seg.action) {
       span.setAttribute('role', 'button');
       span.setAttribute('tabindex', '0');
@@ -280,17 +383,14 @@ function buildBreadcrumb(area, segments) {
       });
     }
     nav.appendChild(span);
-
     if (!isLast) {
       const sep = document.createElement('span');
-      sep.className = 'crumb-sep';
+      sep.className   = 'crumb-sep';
       sep.textContent = '›';
       sep.setAttribute('aria-hidden', 'true');
       nav.appendChild(sep);
     }
   });
-
-  // First child so it appears above section headers
   area.appendChild(nav);
 }
 
@@ -300,7 +400,8 @@ function emptyState(title, sub) {
   div.className = 'empty-state fade-up';
   div.innerHTML = `
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
     </svg>
     <p><strong>${esc(title)}</strong><br/>${esc(sub)}</p>`;
   return div;
@@ -310,118 +411,145 @@ function emptyState(title, sub) {
 // VIEWS
 // ═══════════════════════════════════════════════════
 
-// ── SUBJECTS ──────────────────────────────────────
 function renderSubjects() {
   state.view = 'subjects'; state.subject = null; state.paper = null;
   setTitle('StudyVault'); showBack(false);
   setFab(true, openSubjectModal);
   closeAllMenus();
 
-  const subjects = Object.keys(state.data.subjects || {});
-  const area = $('#contentArea');
+  const area = document.getElementById('contentArea');
+  if (!area) return;
   area.innerHTML = '';
 
-  // Stats
-  const stats = document.createElement('div');
-  stats.className = 'stats-row fade-up';
-  stats.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
-        </svg>
-      </div>
-      <div><div class="stat-value">${subjects.length}</div><div class="stat-label">Subjects</div></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-        </svg>
-      </div>
-      <div><div class="stat-value">${countPapers(state.data)}</div><div class="stat-label">Papers</div></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
-        </svg>
-      </div>
-      <div><div class="stat-value">${countTopics(state.data)}</div><div class="stat-label">Topics</div></div>
-    </div>`;
-  area.appendChild(stats);
+  try {
+    const subjects = Object.keys(state.data.subjects || {});
 
-  const hdr = document.createElement('div');
-  hdr.className = 'section-header fade-up fade-up-d1';
-  hdr.innerHTML = `<span class="section-title">Your Subjects</span>`;
-  area.appendChild(hdr);
-
-  const grid = document.createElement('div');
-  grid.className = 'card-grid fade-up fade-up-d2';
-
-  subjects.forEach(name => {
-    const subj     = state.data.subjects[name];
-    const isDirect = !!subj._direct;
-    const ci       = getColorIdx(name);
-    const color    = SUBJECT_COLORS[ci];
-    const iconSvg  = getIconSvg(name);
-
-    let countText;
-    if (isDirect) {
-      const tc = (subj.topics || []).length;
-      countText = `${tc} topic${tc !== 1 ? 's' : ''} · Direct`;
-    } else {
-      const pc = Object.keys(subj.papers || {}).length;
-      const tc = countTopics({ subjects: { [name]: subj } });
-      countText = `${pc} paper${pc !== 1 ? 's' : ''} · ${tc} topic${tc !== 1 ? 's' : ''}`;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'subj-card';
-    card.tabIndex  = 0;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `Open ${name}`);
-    card.style.setProperty('--card-accent',   color.icon);
-    card.style.setProperty('--card-icon-bg',  color.bg);
-    card.innerHTML = `
-      <div class="subj-actions">
-        <button class="subj-action-btn del" title="Delete ${esc(name)}" aria-label="Delete ${esc(name)}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
+    // ── Stats ──
+    const stats = document.createElement('div');
+    stats.className = 'stats-row fade-up';
+    stats.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
           </svg>
-        </button>
+        </div>
+        <div><div class="stat-value">${subjects.length}</div><div class="stat-label">Subjects</div></div>
       </div>
-      <div class="subj-icon">${iconSvg}</div>
-      <div class="subj-name">${esc(name)}</div>
-      <div class="subj-count">${countText}</div>`;
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div><div class="stat-value">${countPapers(state.data)}</div><div class="stat-label">Papers</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <div><div class="stat-value">${countTopics(state.data)}</div><div class="stat-label">Topics</div></div>
+      </div>`;
+    area.appendChild(stats);
 
-    const open = () => isDirect ? renderDirectTopics(name) : renderPapers(name);
-    card.addEventListener('click',   e => { if (!e.target.closest('.subj-actions')) open(); });
-    card.addEventListener('keydown', e => { if ((e.key==='Enter'||e.key===' ')&&!e.target.closest('.subj-actions')){ e.preventDefault(); open(); }});
+    const hdr = document.createElement('div');
+    hdr.className = 'section-header fade-up fade-up-d1';
+    hdr.innerHTML = `<span class="section-title">Your Subjects</span>`;
+    area.appendChild(hdr);
 
-    card.querySelector('.subj-action-btn.del').onclick = e => {
-      e.stopPropagation();
-      confirmAction(`Delete "${name}" and all its content?`, async () => {
-        delete state.data.subjects[name];
-        await save(); renderSubjects(); showToast(`"${name}" deleted`, 'info');
+    // ── Subject grid ──
+    const grid = document.createElement('div');
+    grid.className = 'card-grid fade-up fade-up-d2';
+
+    subjects.forEach(name => {
+      const subj     = state.data.subjects[name];
+      const isDirect = !!subj._direct;
+      const ci       = getColorIdx(name);
+      const color    = SUBJECT_COLORS[ci];
+      const iconSvg  = getIconSvg(name);
+
+      let countText;
+      if (isDirect) {
+        const tc = (subj.topics || []).length;
+        countText = `${tc} topic${tc !== 1 ? 's' : ''} · Direct`;
+      } else {
+        const pc = Object.keys(subj.papers || {}).length;
+        const tc = countTopics({ subjects: { [name]: subj } });
+        countText = `${pc} paper${pc !== 1 ? 's' : ''} · ${tc} topic${tc !== 1 ? 's' : ''}`;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'subj-card';
+      card.tabIndex  = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `Open ${name}`);
+      card.style.setProperty('--card-accent',  color.icon);
+      card.style.setProperty('--card-icon-bg', color.bg);
+      card.innerHTML = `
+        <div class="subj-actions">
+          <button class="subj-action-btn del" title="Delete ${esc(name)}" aria-label="Delete ${esc(name)}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="subj-icon">${iconSvg}</div>
+        <div class="subj-name">${esc(name)}</div>
+        <div class="subj-count">${countText}</div>`;
+
+      const open = () => isDirect ? renderDirectTopics(name) : renderPapers(name);
+      card.addEventListener('click',   e => { if (!e.target.closest('.subj-actions')) open(); });
+      card.addEventListener('keydown', e => {
+        if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.subj-actions')) {
+          e.preventDefault(); open();
+        }
       });
-    };
-    grid.appendChild(card);
-  });
+      card.querySelector('.subj-action-btn.del').onclick = e => {
+        e.stopPropagation();
+        confirmAction(`Delete "${name}" and all its content?`, async () => {
+          delete state.data.subjects[name];
+          await save(); renderSubjects(); showToast(`"${name}" deleted`, 'info');
+        });
+      };
+      grid.appendChild(card);
+    });
 
-  area.appendChild(grid);
+    area.appendChild(grid);
+
+  } catch (err) {
+    console.error('[StudyVault] renderSubjects error:', err);
+    area.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p><strong>Something went wrong</strong><br/>Your data may be in an old format.</p>
+        <button class="btn primary" id="resetDataBtn" style="margin-top:12px">Reset to Sample Data</button>
+      </div>`;
+    document.getElementById('resetDataBtn')?.addEventListener('click', () => {
+      state.data = makeSample();
+      save();
+      renderSubjects();
+    });
+  }
 }
 
-// ── DIRECT TOPICS (e.g. ICT — no papers layer) ────
+// ── DIRECT TOPICS (e.g. ICT — no papers) ──────────
 function renderDirectTopics(subject) {
   state.view = 'topics'; state.subject = subject; state.paper = null;
   setTitle(subject); showBack(true);
   setFab(true, () => openTopicModal());
   closeAllMenus();
 
-  const topics = state.data.subjects[subject]?.topics || [];
-  const area   = $('#contentArea');
+  const area = document.getElementById('contentArea');
+  if (!area) return;
   area.innerHTML = '';
 
   buildBreadcrumb(area, [
@@ -429,7 +557,8 @@ function renderDirectTopics(subject) {
     { label: subject },
   ]);
 
-  const hdr = document.createElement('div');
+  const topics = state.data.subjects[subject]?.topics || [];
+  const hdr    = document.createElement('div');
   hdr.className = 'section-header fade-up';
   hdr.innerHTML = `<span class="section-title">${esc(subject)} · ${topics.length} topic${topics.length !== 1 ? 's' : ''}</span>`;
   area.appendChild(hdr);
@@ -452,8 +581,8 @@ function renderPapers(subject) {
   setFab(true, openPaperModal);
   closeAllMenus();
 
-  const papers = Object.keys(state.data.subjects[subject]?.papers || {});
-  const area   = $('#contentArea');
+  const area = document.getElementById('contentArea');
+  if (!area) return;
   area.innerHTML = '';
 
   buildBreadcrumb(area, [
@@ -461,7 +590,8 @@ function renderPapers(subject) {
     { label: subject },
   ]);
 
-  const hdr = document.createElement('div');
+  const papers = Object.keys(state.data.subjects[subject]?.papers || {});
+  const hdr    = document.createElement('div');
   hdr.className = 'section-header fade-up';
   hdr.innerHTML = `<span class="section-title">${esc(subject)} · Papers</span>`;
   area.appendChild(hdr);
@@ -477,28 +607,38 @@ function renderPapers(subject) {
   papers.forEach(name => {
     const topics = state.data.subjects[subject].papers[name] || [];
     const card   = document.createElement('div');
-    card.className = 'paper-card'; card.tabIndex = 0;
-    card.setAttribute('role', 'button'); card.setAttribute('aria-label', `Open ${name}`);
+    card.className = 'paper-card';
+    card.tabIndex  = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Open ${name}`);
     card.innerHTML = `
       <div class="paper-actions">
         <button class="subj-action-btn del" title="Delete paper" aria-label="Delete ${esc(name)}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M9 6V4h6v2"/>
           </svg>
         </button>
       </div>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
         <polyline points="10 9 9 9 8 9"/>
       </svg>
       <div class="paper-name">${esc(name)}</div>
       <div class="paper-count">${topics.length} topic${topics.length !== 1 ? 's' : ''}</div>`;
 
-    card.addEventListener('click',   e => { if (!e.target.closest('.paper-actions')) renderTopics(subject, name); });
-    card.addEventListener('keydown', e => { if ((e.key==='Enter'||e.key===' ')&&!e.target.closest('.paper-actions')){ e.preventDefault(); renderTopics(subject, name); }});
-
+    card.addEventListener('click', e => {
+      if (!e.target.closest('.paper-actions')) renderTopics(subject, name);
+    });
+    card.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.paper-actions')) {
+        e.preventDefault(); renderTopics(subject, name);
+      }
+    });
     card.querySelector('.subj-action-btn.del').onclick = e => {
       e.stopPropagation();
       confirmAction(`Delete paper "${name}" and all its topics?`, async () => {
@@ -509,17 +649,21 @@ function renderPapers(subject) {
     grid.appendChild(card);
   });
 
-  // Inline add-card
   const addTile = document.createElement('div');
-  addTile.className = 'add-card'; addTile.tabIndex = 0;
-  addTile.setAttribute('role', 'button'); addTile.setAttribute('aria-label', 'Add paper');
+  addTile.className = 'add-card';
+  addTile.tabIndex  = 0;
+  addTile.setAttribute('role', 'button');
+  addTile.setAttribute('aria-label', 'Add paper');
   addTile.innerHTML = `
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
     <span style="font-size:.82rem;font-weight:600">Add Paper</span>`;
   addTile.onclick = openPaperModal;
-  addTile.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); openPaperModal(); }});
+  addTile.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPaperModal(); }
+  });
   grid.appendChild(addTile);
   area.appendChild(grid);
 }
@@ -531,8 +675,8 @@ function renderTopics(subject, paper) {
   setFab(true, () => openTopicModal());
   closeAllMenus();
 
-  const topics = state.data.subjects[subject]?.papers?.[paper] || [];
-  const area   = $('#contentArea');
+  const area = document.getElementById('contentArea');
+  if (!area) return;
   area.innerHTML = '';
 
   buildBreadcrumb(area, [
@@ -541,7 +685,8 @@ function renderTopics(subject, paper) {
     { label: paper },
   ]);
 
-  const hdr = document.createElement('div');
+  const topics = state.data.subjects[subject]?.papers?.[paper] || [];
+  const hdr    = document.createElement('div');
   hdr.className = 'section-header fade-up';
   hdr.innerHTML = `<span class="section-title">${esc(subject)} › ${esc(paper)} · ${topics.length} topic${topics.length !== 1 ? 's' : ''}</span>`;
   area.appendChild(hdr);
@@ -563,7 +708,8 @@ function renderSearch(q) {
   setTitle('Search'); showBack(true); setFab(false, null);
   closeAllMenus();
 
-  const area = $('#contentArea');
+  const area = document.getElementById('contentArea');
+  if (!area) return;
   area.innerHTML = '';
 
   buildBreadcrumb(area, [
@@ -572,7 +718,7 @@ function renderSearch(q) {
   ]);
 
   const results = [];
-  const ql = q.toLowerCase();
+  const ql      = q.toLowerCase();
   for (const [subj, sData] of Object.entries(state.data.subjects || {})) {
     if (sData._direct) {
       for (const t of (sData.topics || []))
@@ -596,7 +742,6 @@ function renderSearch(q) {
   countDiv.innerHTML = `<span class="section-title">${results.length} result${results.length !== 1 ? 's' : ''} for "${esc(q)}"</span>`;
   area.appendChild(countDiv);
 
-  // Group by subject → paper
   const groups = {};
   results.forEach(r => {
     if (!groups[r.subj]) groups[r.subj] = {};
@@ -612,11 +757,12 @@ function renderSearch(q) {
     for (const [pk, topics] of Object.entries(papers)) {
       if (pk !== '__direct__') {
         const pl = document.createElement('div');
-        pl.className = 'search-group-paper'; pl.textContent = pk;
+        pl.className   = 'search-group-paper';
+        pl.textContent = pk;
         grp.appendChild(pl);
       }
-      const list = document.createElement('div');
-      list.className = 'topic-list';
+      const list        = document.createElement('div');
+      list.className    = 'topic-list';
       const actualPaper = pk === '__direct__' ? null : pk;
       topics.forEach(t => list.appendChild(makeTopicItem(t, subj, actualPaper, 0)));
       grp.appendChild(list);
@@ -626,15 +772,13 @@ function renderSearch(q) {
 }
 
 // ═══════════════════════════════════════════════════
-// TOPIC ITEM  (portal-based 3-dot menu — fully fixed)
+// TOPIC ITEM  (fixed portal menu)
 // ═══════════════════════════════════════════════════
-// We track which button currently has its menu open.
-// Clicking same button toggles it off.
-// Clicking a different button closes the old and opens a new one.
 let openMenuBtn = null;
 
 function closeAllMenus() {
-  $('#topic-menu-portal').innerHTML = '';
+  const portal = document.getElementById('topic-menu-portal');
+  if (portal) portal.innerHTML = '';
   if (openMenuBtn) {
     openMenuBtn.setAttribute('aria-expanded', 'false');
     openMenuBtn = null;
@@ -642,8 +786,8 @@ function closeAllMenus() {
 }
 
 function makeTopicItem(t, subject, paper, idx) {
-  const item = document.createElement('div');
-  item.className = 'topic-item';
+  const item      = document.createElement('div');
+  item.className  = 'topic-item';
   item.dataset.id = t.id;
   item.draggable  = true;
 
@@ -662,7 +806,8 @@ function makeTopicItem(t, subject, paper, idx) {
     <a class="topic-link" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open link">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
       </svg>
       Open
     </a>
@@ -677,56 +822,42 @@ function makeTopicItem(t, subject, paper, idx) {
     </div>`;
 
   const menuBtn = item.querySelector('.menu-btn');
-  const portal  = $('#topic-menu-portal');
 
   function openPortalMenu() {
-    // Close any existing menu first (including from other rows)
     closeAllMenus();
+    const portal = document.getElementById('topic-menu-portal');
+    if (!portal) return;
 
-    const rect = menuBtn.getBoundingClientRect();
-
-    // Position: fixed, right-aligned to button
-    // Flip upward if too close to bottom of viewport
+    const rect       = menuBtn.getBoundingClientRect();
     const menuHeight = 94;
-    const top = (rect.bottom + menuHeight > window.innerHeight)
+    const top        = (rect.bottom + menuHeight > window.innerHeight)
       ? rect.top - menuHeight
       : rect.bottom + 6;
 
     const menu = document.createElement('div');
     menu.className = 'menu-content open portal-menu';
     menu.setAttribute('role', 'menu');
-    menu.style.cssText = `
-      pointer-events: auto;
-      position: fixed;
-      top: ${top}px;
-      right: ${window.innerWidth - rect.right}px;
-    `;
-
+    menu.style.cssText = `pointer-events:auto;position:fixed;top:${top}px;right:${window.innerWidth - rect.right}px;`;
     menu.innerHTML = `
       <button class="menu-item edit-btn" role="menuitem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        Edit
+        </svg>Edit
       </button>
       <button class="menu-item danger delete-btn" role="menuitem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
-        </svg>
-        Delete
+          <path d="M19 6l-1 14H6L5 6"/>
+          <path d="M9 6V4h6v2"/>
+        </svg>Delete
       </button>`;
 
     menu.querySelector('.edit-btn').onclick = e => {
-      e.stopPropagation();
-      closeAllMenus();
-      openTopicModal(t);
+      e.stopPropagation(); closeAllMenus(); openTopicModal(t);
     };
-
     menu.querySelector('.delete-btn').onclick = e => {
-      e.stopPropagation();
-      closeAllMenus();
+      e.stopPropagation(); closeAllMenus();
       confirmAction(`Delete topic "${t.title}"?`, async () => {
         const arr = paper
           ? state.data.subjects[subject].papers[paper]
@@ -744,26 +875,17 @@ function makeTopicItem(t, subject, paper, idx) {
     openMenuBtn = menuBtn;
   }
 
-  // FIX: track which button is open so clicking same btn toggles,
-  // clicking a different btn closes old + opens new.
   menuBtn.addEventListener('click', e => {
     e.stopPropagation();
-    if (openMenuBtn === menuBtn) {
-      // Same button clicked again → close (toggle off)
-      closeAllMenus();
-    } else {
-      // Different button → openPortalMenu closes old then opens new
-      openPortalMenu();
-    }
+    openMenuBtn === menuBtn ? closeAllMenus() : openPortalMenu();
   });
 
-  // Click row body → open link
   item.addEventListener('click', e => {
     if (e.target.closest('a, .topic-menu, .drag-handle')) return;
     window.open(t.url, '_blank', 'noopener,noreferrer');
   });
 
-  // ── DRAG & DROP ───────────────────────────────────
+  // Drag & drop
   item.addEventListener('dragstart', e => {
     state.dragSrc = t.id;
     e.dataTransfer.effectAllowed = 'move';
@@ -771,8 +893,7 @@ function makeTopicItem(t, subject, paper, idx) {
     setTimeout(() => item.classList.add('dragging'), 0);
   });
   item.addEventListener('dragend', () => {
-    item.classList.remove('dragging');
-    state.dragSrc = null;
+    item.classList.remove('dragging'); state.dragSrc = null;
     $$('.topic-item').forEach(el => el.style.borderTop = '');
   });
   item.addEventListener('dragover', e => {
@@ -782,11 +903,10 @@ function makeTopicItem(t, subject, paper, idx) {
   });
   item.addEventListener('dragleave', () => { item.style.borderTop = ''; });
   item.addEventListener('drop', async e => {
-    e.preventDefault();
-    item.style.borderTop = '';
+    e.preventDefault(); item.style.borderTop = '';
     const srcId = e.dataTransfer.getData('text/plain');
     if (!srcId || srcId === t.id) return;
-    const arr = paper
+    const arr  = paper
       ? state.data.subjects[subject].papers[paper]
       : state.data.subjects[subject].topics;
     const from = arr.findIndex(x => x.id === srcId);
@@ -804,119 +924,133 @@ function makeTopicItem(t, subject, paper, idx) {
 // MODALS
 // ═══════════════════════════════════════════════════
 
-// ── CONFIRM ───────────────────────────────────────
 let pendingConfirm = null;
 function confirmAction(msg, onOk) {
-  $('#confirmMsg').textContent = msg;
+  const el = document.getElementById('confirmMsg');
+  if (el) el.textContent = msg;
   pendingConfirm = onOk;
   openModal('confirmModal');
 }
 
-// ── TOPIC MODAL ────────────────────────────────────
 function openTopicModal(existing = null) {
-  $('#topicForm').reset();
-  $('#topicTitleError').textContent = '';
-  $('#topicUrlError').textContent   = '';
+  const form = document.getElementById('topicForm');
+  if (form) form.reset();
+  const titleErr = document.getElementById('topicTitleError');
+  const urlErr   = document.getElementById('topicUrlError');
+  if (titleErr) titleErr.textContent = '';
+  if (urlErr)   urlErr.textContent   = '';
+
+  const modalTitle   = document.getElementById('modalTitle');
+  const saveBtn      = document.getElementById('saveTopicBtn');
+  const topicIdEl    = document.getElementById('topicId');
+  const topicTitleEl = document.getElementById('topicTitle');
+  const topicUrlEl   = document.getElementById('topicUrl');
 
   if (existing) {
-    $('#modalTitle').textContent   = 'Edit Topic';
-    $('#saveTopicBtn').textContent = 'Save Changes';
-    $('#topicId').value    = existing.id;
-    $('#topicTitle').value = existing.title;
-    $('#topicUrl').value   = existing.url;
+    if (modalTitle) modalTitle.textContent = 'Edit Topic';
+    if (saveBtn)    saveBtn.textContent    = 'Save Changes';
+    if (topicIdEl)    topicIdEl.value    = existing.id;
+    if (topicTitleEl) topicTitleEl.value = existing.title;
+    if (topicUrlEl)   topicUrlEl.value   = existing.url;
   } else {
-    $('#modalTitle').textContent   = 'Add Topic';
-    $('#saveTopicBtn').textContent = 'Add Topic';
-    $('#topicId').value = '';
+    if (modalTitle) modalTitle.textContent = 'Add Topic';
+    if (saveBtn)    saveBtn.textContent    = 'Add Topic';
+    if (topicIdEl)  topicIdEl.value = '';
   }
   openModal('topicModal');
 }
 
 function validateTopic(title, url) {
   let ok = true;
-  $('#topicTitleError').textContent = '';
-  $('#topicUrlError').textContent   = '';
+  const titleErr = document.getElementById('topicTitleError');
+  const urlErr   = document.getElementById('topicUrlError');
+  if (titleErr) titleErr.textContent = '';
+  if (urlErr)   urlErr.textContent   = '';
   if (!title || title.length < 2) {
-    $('#topicTitleError').textContent = 'Title must be at least 2 characters.';
+    if (titleErr) titleErr.textContent = 'Title must be at least 2 characters.';
     ok = false;
   }
   if (!/^https?:\/\/.+/.test(url)) {
-    $('#topicUrlError').textContent = 'Enter a valid URL starting with https://';
+    if (urlErr) urlErr.textContent = 'Enter a valid URL starting with https://';
     ok = false;
   }
   return ok;
 }
 
-// ── SUBJECT MODAL ──────────────────────────────────
 let selectedIconKey  = 'book';
 let selectedColorIdx = 0;
 
 function openSubjectModal() {
-  $('#subjectName').value = '';
-  $('#subjectNameError').textContent = '';
-  $('#subjectDirect').checked = false;
+  const nameEl   = document.getElementById('subjectName');
+  const nameErr  = document.getElementById('subjectNameError');
+  const directEl = document.getElementById('subjectDirect');
+  if (nameEl)   nameEl.value = '';
+  if (nameErr)  nameErr.textContent = '';
+  if (directEl) directEl.checked = false;
+
   selectedColorIdx = Object.keys(state.data.subjects).length % SUBJECT_COLORS.length;
   selectedIconKey  = 'book';
 
-  const picker = $('#iconPicker');
-  picker.innerHTML = '';
-  SUBJECT_ICONS.forEach((icon, i) => {
-    const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
-    const el    = document.createElement('div');
-    el.className = 'icon-picker-item' + (icon.key === selectedIconKey ? ' selected' : '');
-    el.title     = icon.label;
-    el.setAttribute('role',        'radio');
-    el.setAttribute('aria-checked', String(icon.key === selectedIconKey));
-    el.setAttribute('tabindex',     icon.key === selectedIconKey ? '0' : '-1');
-    el.innerHTML = `${icon.svg}<span class="icon-picker-dot" style="background:${color.icon}"></span>`;
-
-    el.addEventListener('click', () => {
-      $$('.icon-picker-item').forEach(x => {
-        x.classList.remove('selected');
-        x.setAttribute('aria-checked', 'false');
-        x.setAttribute('tabindex', '-1');
+  const picker = document.getElementById('iconPicker');
+  if (picker) {
+    picker.innerHTML = '';
+    SUBJECT_ICONS.forEach((icon, i) => {
+      const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
+      const el    = document.createElement('div');
+      el.className = 'icon-picker-item' + (icon.key === selectedIconKey ? ' selected' : '');
+      el.title     = icon.label;
+      el.setAttribute('role', 'radio');
+      el.setAttribute('aria-checked', String(icon.key === selectedIconKey));
+      el.setAttribute('tabindex', icon.key === selectedIconKey ? '0' : '-1');
+      el.innerHTML = `${icon.svg}<span class="icon-picker-dot" style="background:${color.icon}"></span>`;
+      el.addEventListener('click', () => {
+        $$('.icon-picker-item').forEach(x => {
+          x.classList.remove('selected');
+          x.setAttribute('aria-checked', 'false');
+          x.setAttribute('tabindex', '-1');
+        });
+        el.classList.add('selected');
+        el.setAttribute('aria-checked', 'true');
+        el.setAttribute('tabindex', '0');
+        selectedIconKey  = icon.key;
+        selectedColorIdx = i % SUBJECT_COLORS.length;
       });
-      el.classList.add('selected');
-      el.setAttribute('aria-checked', 'true');
-      el.setAttribute('tabindex', '0');
-      selectedIconKey  = icon.key;
-      selectedColorIdx = i % SUBJECT_COLORS.length;
+      picker.appendChild(el);
     });
-    picker.appendChild(el);
-  });
-
+  }
   openModal('subjectModal');
 }
 
-// ── PAPER MODAL ────────────────────────────────────
 function openPaperModal() {
-  $('#paperName').value = '';
-  $('#paperNameError').textContent = '';
+  const nameEl  = document.getElementById('paperName');
+  const nameErr = document.getElementById('paperNameError');
+  if (nameEl)  nameEl.value = '';
+  if (nameErr) nameErr.textContent = '';
   openModal('paperModal');
 }
 
-// ── EXPORT ────────────────────────────────────────
+// ── EXPORT / IMPORT ───────────────────────────────
 function exportData() {
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `StudyVault-${new Date().toISOString().slice(0, 10)}.json`
+    href: url, download: `StudyVault-${new Date().toISOString().slice(0, 10)}.json`
   });
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('Backup exported', 'success');
 }
 
-// ── IMPORT ────────────────────────────────────────
 function importData(file) {
-  if (!file || file.type !== 'application/json') { showToast('Select a valid .json file', 'error'); return; }
+  if (!file || file.type !== 'application/json') {
+    showToast('Select a valid .json file', 'error'); return;
+  }
   const reader = new FileReader();
   reader.onload = async e => {
     try {
       const parsed = JSON.parse(e.target.result);
-      if (!parsed.subjects) { showToast('Invalid backup format', 'error'); return; }
-      if (!confirm('Import this backup? Your current data will be replaced.')) return;
+      if (!parsed || !parsed.subjects) { showToast('Invalid backup format', 'error'); return; }
+      if (!confirm('Import this backup? Current data will be replaced.')) return;
       state.data = parsed; await save(); renderSubjects(); showToast('Data imported', 'success');
     } catch { showToast('Failed to parse file', 'error'); }
   };
@@ -926,7 +1060,8 @@ function importData(file) {
 // ── THEME ─────────────────────────────────────────
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  const icon = $('#themeIcon');
+  const icon = document.getElementById('themeIcon');
+  if (!icon) return;
   if (theme === 'light') {
     icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
   } else {
@@ -934,10 +1069,10 @@ function applyTheme(theme) {
       <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
       <line x1="12" y1="1"    x2="12" y2="3"    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       <line x1="12" y1="21"   x2="12" y2="23"   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      <line x1="4.22" y1="4.22"   x2="5.64"  y2="5.64"  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="4.22"  y1="4.22"  x2="5.64"  y2="5.64"  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      <line x1="1"  y1="12" x2="3"  y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="1"     y1="12"    x2="3"     y2="12"    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="21"    y1="12"    x2="23"    y2="12"    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       <line x1="4.22"  y1="19.78" x2="5.64"  y2="18.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
   }
@@ -946,131 +1081,151 @@ function applyTheme(theme) {
 
 // ── USER UI ───────────────────────────────────────
 function updateUserUI(user) {
-  const avatar     = $('#userAvatar');
-  const initials   = $('#userInitials');
-  const signInBtn  = $('#signInFromApp');
-  const signOutBtn = $('#signOutBtn');
+  const avatar     = document.getElementById('userAvatar');
+  const initials   = document.getElementById('userInitials');
+  const signInBtn  = document.getElementById('signInFromApp');
+  const signOutBtn = document.getElementById('signOutBtn');
+  const dName      = document.getElementById('dropdownName');
+  const dEmail     = document.getElementById('dropdownEmail');
 
   if (user) {
-    if (user.photoURL) {
-      avatar.src = user.photoURL; avatar.style.display = 'block'; initials.style.display = 'none';
-    } else {
+    if (user.photoURL && avatar) {
+      avatar.src = user.photoURL; avatar.style.display = 'block';
+      if (initials) initials.style.display = 'none';
+    } else if (initials) {
       initials.textContent = (user.displayName || 'U')[0].toUpperCase();
-      avatar.style.display = 'none'; initials.style.display = 'flex';
+      if (avatar) avatar.style.display = 'none';
+      initials.style.display = 'flex';
     }
-    $('#dropdownName').textContent  = user.displayName || 'User';
-    $('#dropdownEmail').textContent = user.email || '';
-    signInBtn.style.display = 'none'; signOutBtn.style.display = 'flex';
+    if (dName)  dName.textContent  = user.displayName || 'User';
+    if (dEmail) dEmail.textContent = user.email || '';
+    if (signInBtn)  signInBtn.style.display  = 'none';
+    if (signOutBtn) signOutBtn.style.display = 'flex';
     setSyncState('synced');
   } else {
-    avatar.style.display = 'none'; initials.textContent = 'G'; initials.style.display = 'flex';
-    $('#dropdownName').textContent  = 'Guest';
-    $('#dropdownEmail').textContent = 'Not signed in';
-    signInBtn.style.display = 'flex'; signOutBtn.style.display = 'none';
+    if (avatar)   avatar.style.display = 'none';
+    if (initials) { initials.textContent = 'G'; initials.style.display = 'flex'; }
+    if (dName)  dName.textContent  = 'Guest';
+    if (dEmail) dEmail.textContent = 'Not signed in';
+    if (signInBtn)  signInBtn.style.display  = 'flex';
+    if (signOutBtn) signOutBtn.style.display = 'none';
     setSyncState('offline');
   }
 }
 
 // ── AUTH ──────────────────────────────────────────
 async function signInWithGoogle() {
-  if (!firebaseReady()) { showToast('Firebase not configured — see SETUP.md', 'warning', 6000); return; }
+  if (!firebaseReady() || !auth) {
+    showToast('Firebase not configured — see SETUP.md', 'warning', 6000); return;
+  }
   try {
     await signInWithPopup(auth, new GoogleAuthProvider());
-    // onAuthStateChanged handles the rest
   } catch (e) {
-    if (e.code !== 'auth/popup-closed-by-user') { console.error(e); showToast('Sign in failed: ' + e.message, 'error'); }
+    if (e.code !== 'auth/popup-closed-by-user') {
+      console.error(e); showToast('Sign in failed: ' + e.message, 'error');
+    }
   }
 }
-
 async function signOutUser() {
   if (!auth) return;
   if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
-  await signOut(auth); currentUser = null; updateUserUI(null); setSyncState('offline');
+  await signOut(auth); currentUser = null;
+  updateUserUI(null); setSyncState('offline');
   showToast('Signed out', 'info');
 }
 
-// ── NETWORK ───────────────────────────────────────
-window.addEventListener('online',  () => { setSyncState(currentUser ? 'synced' : 'offline'); if (currentUser) schedulePush(); showToast('Back online', 'success'); });
-window.addEventListener('offline', () => { setSyncState('offline'); showToast('Offline — saved locally', 'warning'); });
+window.addEventListener('online',  () => {
+  setSyncState(currentUser ? 'synced' : 'offline');
+  if (currentUser) schedulePush();
+  showToast('Back online', 'success');
+});
+window.addEventListener('offline', () => {
+  setSyncState('offline');
+  showToast('Offline — saved locally', 'warning');
+});
 
 // ═══════════════════════════════════════════════════
 // EVENT WIRING
 // ═══════════════════════════════════════════════════
 function wireEvents() {
-
-  // ── Back button ──
-  // FIX: topics with paper===null → direct subject → go to subjects, not papers
-  $('#backBtn').addEventListener('click', () => {
-    if (state.view === 'topics') {
+  // Back
+  document.getElementById('backBtn')?.addEventListener('click', () => {
+    if (state.view === 'topics')
       return state.paper !== null ? renderPapers(state.subject) : renderSubjects();
-    }
     if (state.view === 'papers' || state.view === 'search') return renderSubjects();
     renderSubjects();
   });
 
-  // ── Search ──
+  // Search
   let searchTimer;
-  $('#searchInput').addEventListener('input', e => {
+  document.getElementById('searchInput')?.addEventListener('input', e => {
     const q = e.target.value.trim();
     clearTimeout(searchTimer);
     if (!q) { state.searchQuery = ''; render(); return; }
     searchTimer = setTimeout(() => { state.searchQuery = q; renderSearch(q); }, 260);
   });
-  $('#searchInput').addEventListener('keydown', e => {
+  document.getElementById('searchInput')?.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.target.value = ''; state.searchQuery = ''; render(); }
   });
 
-  // ── Theme ──
-  $('#themeToggle').addEventListener('click', () => {
-    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  // Theme
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    applyTheme(
+      document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+    );
   });
 
-  // ── Export / Import ──
-  $('#exportBtn').addEventListener('click', exportData);
-  $('#importFile').addEventListener('change', e => { importData(e.target.files[0]); e.target.value = ''; });
+  // Export / Import
+  document.getElementById('exportBtn')?.addEventListener('click', exportData);
+  document.getElementById('importFile')?.addEventListener('change', e => {
+    importData(e.target.files[0]); e.target.value = '';
+  });
 
-  // ── Manual sync ──
-  $('#syncBtn').addEventListener('click', () => {
+  // Sync (manual pull)
+  document.getElementById('syncBtn')?.addEventListener('click', () => {
     if (!currentUser) { showToast('Sign in to sync across devices', 'info'); return; }
     pullFromFirestore();
   });
 
-  // ── User dropdown ──
-  const userBtn  = $('#userMenuBtn');
-  const dropdown = $('#userDropdown');
-  userBtn.addEventListener('click', e => {
+  // User dropdown
+  const userBtn  = document.getElementById('userMenuBtn');
+  const dropdown = document.getElementById('userDropdown');
+  userBtn?.addEventListener('click', e => {
     e.stopPropagation();
     const open = dropdown.classList.toggle('open');
-    userBtn.setAttribute('aria-expanded',   String(open));
-    dropdown.setAttribute('aria-hidden', String(!open));
+    userBtn.setAttribute('aria-expanded', String(open));
+    dropdown.setAttribute('aria-hidden',  String(!open));
   });
   document.addEventListener('click', e => {
-    if (!e.target.closest('.user-area')) {
+    if (!e.target.closest('.user-area') && dropdown) {
       dropdown.classList.remove('open');
-      userBtn.setAttribute('aria-expanded', 'false');
-      dropdown.setAttribute('aria-hidden',  'true');
+      userBtn?.setAttribute('aria-expanded', 'false');
+      dropdown.setAttribute('aria-hidden', 'true');
     }
   });
 
-  // ── Auth buttons ──
-  $('#googleSignInBtn').addEventListener('click', signInWithGoogle);
-  $('#guestBtn').addEventListener('click', () => {
-    $('#authScreen').style.display = 'none';
-    $('#app').style.display = 'block';
+  // Auth
+  document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
+  document.getElementById('guestBtn')?.addEventListener('click', () => {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('app').style.display        = 'block';
     updateUserUI(null); renderSubjects();
   });
-  $('#signInFromApp').addEventListener('click', () => { dropdown.classList.remove('open'); signInWithGoogle(); });
-  $('#signOutBtn').addEventListener('click',    () => { dropdown.classList.remove('open'); signOutUser(); });
+  document.getElementById('signInFromApp')?.addEventListener('click', () => {
+    dropdown?.classList.remove('open'); signInWithGoogle();
+  });
+  document.getElementById('signOutBtn')?.addEventListener('click', () => {
+    dropdown?.classList.remove('open'); signOutUser();
+  });
 
-  // ── Topic form ──
-  $('#topicForm').addEventListener('submit', async e => {
+  // Topic form
+  document.getElementById('topicForm')?.addEventListener('submit', async e => {
     e.preventDefault();
-    const id    = $('#topicId').value;
-    const title = $('#topicTitle').value.trim();
-    const url   = $('#topicUrl').value.trim();
+    const id    = document.getElementById('topicId')?.value || '';
+    const title = document.getElementById('topicTitle')?.value.trim() || '';
+    const url   = document.getElementById('topicUrl')?.value.trim() || '';
     if (!validateTopic(title, url)) return;
 
-    // FIX: use paper===null check (not falsy) since null means direct subject
     const isDirect = (state.paper === null);
     const arr = isDirect
       ? state.data.subjects[state.subject].topics
@@ -1089,16 +1244,19 @@ function wireEvents() {
     isDirect ? renderDirectTopics(state.subject) : renderTopics(state.subject, state.paper);
   });
 
-  $('#cancelModalBtn').addEventListener('click', () => closeModal('topicModal'));
-  $('#topicModal').addEventListener('click', e => { if (e.target === $('#topicModal')) closeModal('topicModal'); });
+  document.getElementById('cancelModalBtn')?.addEventListener('click', () => closeModal('topicModal'));
+  document.getElementById('topicModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('topicModal')) closeModal('topicModal');
+  });
 
-  // ── Subject form ──
-  $('#saveSubjectBtn').addEventListener('click', async () => {
-    const name   = $('#subjectName').value.trim();
-    const direct = $('#subjectDirect').checked;
-    $('#subjectNameError').textContent = '';
-    if (!name) { $('#subjectNameError').textContent = 'Enter a subject name.'; return; }
-    if (state.data.subjects[name]) { $('#subjectNameError').textContent = 'Subject already exists.'; return; }
+  // Subject form
+  document.getElementById('saveSubjectBtn')?.addEventListener('click', async () => {
+    const name   = document.getElementById('subjectName')?.value.trim() || '';
+    const direct = document.getElementById('subjectDirect')?.checked || false;
+    const nameErr = document.getElementById('subjectNameError');
+    if (nameErr) nameErr.textContent = '';
+    if (!name) { if (nameErr) nameErr.textContent = 'Enter a subject name.'; return; }
+    if (state.data.subjects[name]) { if (nameErr) nameErr.textContent = 'Subject already exists.'; return; }
 
     state.data.subjects[name] = direct
       ? { _colorIdx: selectedColorIdx, _iconKey: selectedIconKey, _direct: true, topics: [] }
@@ -1106,43 +1264,56 @@ function wireEvents() {
 
     await save(); closeModal('subjectModal'); renderSubjects(); showToast(`"${name}" added`, 'success');
   });
-  $('#cancelSubjectBtn').addEventListener('click', () => closeModal('subjectModal'));
-  $('#subjectModal').addEventListener('click', e => { if (e.target === $('#subjectModal')) closeModal('subjectModal'); });
-  $('#subjectName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#saveSubjectBtn').click(); });
+  document.getElementById('cancelSubjectBtn')?.addEventListener('click', () => closeModal('subjectModal'));
+  document.getElementById('subjectModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('subjectModal')) closeModal('subjectModal');
+  });
+  document.getElementById('subjectName')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('saveSubjectBtn')?.click();
+  });
 
-  // ── Paper form ──
-  $('#savePaperBtn').addEventListener('click', async () => {
-    const name = $('#paperName').value.trim();
-    $('#paperNameError').textContent = '';
-    if (!name) { $('#paperNameError').textContent = 'Enter a paper name.'; return; }
-    if (state.data.subjects[state.subject].papers[name]) { $('#paperNameError').textContent = 'Paper already exists.'; return; }
+  // Paper form
+  document.getElementById('savePaperBtn')?.addEventListener('click', async () => {
+    const name    = document.getElementById('paperName')?.value.trim() || '';
+    const nameErr = document.getElementById('paperNameError');
+    if (nameErr) nameErr.textContent = '';
+    if (!name) { if (nameErr) nameErr.textContent = 'Enter a paper name.'; return; }
+    if (state.data.subjects[state.subject].papers[name]) {
+      if (nameErr) nameErr.textContent = 'Paper already exists.'; return;
+    }
     state.data.subjects[state.subject].papers[name] = [];
     await save(); closeModal('paperModal'); renderPapers(state.subject); showToast(`"${name}" added`, 'success');
   });
-  $('#cancelPaperBtn').addEventListener('click', () => closeModal('paperModal'));
-  $('#paperModal').addEventListener('click', e => { if (e.target === $('#paperModal')) closeModal('paperModal'); });
-  $('#paperName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#savePaperBtn').click(); });
+  document.getElementById('cancelPaperBtn')?.addEventListener('click', () => closeModal('paperModal'));
+  document.getElementById('paperModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('paperModal')) closeModal('paperModal');
+  });
+  document.getElementById('paperName')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('savePaperBtn')?.click();
+  });
 
-  // ── Confirm modal ──
-  $('#confirmOk').addEventListener('click', () => {
+  // Confirm modal
+  document.getElementById('confirmOk')?.addEventListener('click', () => {
     closeModal('confirmModal');
     if (pendingConfirm) { pendingConfirm(); pendingConfirm = null; }
   });
-  $('#confirmCancel').addEventListener('click', () => { closeModal('confirmModal'); pendingConfirm = null; });
+  document.getElementById('confirmCancel')?.addEventListener('click', () => {
+    closeModal('confirmModal'); pendingConfirm = null;
+  });
 
-  // ── Generic modal close (× buttons) ──
+  // Generic modal close buttons
   $$('.modal-close[data-modal]').forEach(btn =>
     btn.addEventListener('click', () => closeModal(btn.dataset.modal))
   );
 
-  // ── Close portal menu on outside click ──
+  // Close portal menu on outside click
   document.addEventListener('click', e => {
     if (!e.target.closest('.topic-menu') && !e.target.closest('.portal-menu')) {
       closeAllMenus();
     }
   });
 
-  // ── Escape closes modals and menus ──
+  // Escape
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeAllModals(); closeAllMenus(); }
   });
@@ -1151,19 +1322,24 @@ function wireEvents() {
 // ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
-async function init() {
+function init() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
   wireEvents();
-  state.data = await localLoad();
 
-  if (firebaseReady()) {
-    $('#authScreen').style.display = 'flex';
+  // Load data synchronously from localStorage (no await, no CDN, always works)
+  state.data = loadData();
+
+  // Save sample data if it was freshly generated
+  storageSave(state.data);
+
+  if (firebaseReady() && auth) {
+    document.getElementById('authScreen').style.display = 'flex';
 
     onAuthStateChanged(auth, async user => {
       currentUser = user;
       if (user) {
-        $('#authScreen').style.display = 'none';
-        $('#app').style.display        = 'block';
+        document.getElementById('authScreen').style.display = 'none';
+        document.getElementById('app').style.display        = 'block';
         updateUserUI(user);
         showLoading(true);
         await pullFromFirestore();
@@ -1172,18 +1348,18 @@ async function init() {
         renderSubjects();
         showToast(`Welcome, ${user.displayName?.split(' ')[0] || 'User'}!`, 'success');
       } else {
-        $('#authScreen').style.display = 'flex';
-        $('#app').style.display        = 'none';
+        document.getElementById('authScreen').style.display = 'flex';
+        document.getElementById('app').style.display        = 'none';
       }
     });
   } else {
     // Offline-only mode — no Firebase config provided
-    console.warn('[StudyVault] Firebase not configured. Running offline-only. See SETUP.md.');
-    $('#authScreen').style.display = 'none';
-    $('#app').style.display        = 'block';
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('app').style.display        = 'block';
     updateUserUI(null);
     renderSubjects();
   }
 }
 
+// Run immediately — no async needed since localStorage is synchronous
 init();
