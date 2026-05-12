@@ -558,10 +558,6 @@ function renderDirectTopics(subject) {
   ]);
 
   const topics = state.data.subjects[subject]?.topics || [];
-  const hdr    = document.createElement('div');
-  hdr.className = 'section-header fade-up';
-  hdr.innerHTML = `<span class="section-title">${esc(subject)} · ${topics.length} topic${topics.length !== 1 ? 's' : ''}</span>`;
-  area.appendChild(hdr);
 
   if (topics.length === 0) {
     area.appendChild(emptyState('No topics yet', 'Tap + to add your first class link.'));
@@ -591,10 +587,6 @@ function renderPapers(subject) {
   ]);
 
   const papers = Object.keys(state.data.subjects[subject]?.papers || {});
-  const hdr    = document.createElement('div');
-  hdr.className = 'section-header fade-up';
-  hdr.innerHTML = `<span class="section-title">${esc(subject)} · Papers</span>`;
-  area.appendChild(hdr);
 
   if (papers.length === 0) {
     area.appendChild(emptyState('No papers yet', 'Tap + to add your first paper.'));
@@ -686,10 +678,6 @@ function renderTopics(subject, paper) {
   ]);
 
   const topics = state.data.subjects[subject]?.papers?.[paper] || [];
-  const hdr    = document.createElement('div');
-  hdr.className = 'section-header fade-up';
-  hdr.innerHTML = `<span class="section-title">${esc(subject)} › ${esc(paper)} · ${topics.length} topic${topics.length !== 1 ? 's' : ''}</span>`;
-  area.appendChild(hdr);
 
   if (topics.length === 0) {
     area.appendChild(emptyState('No topics yet', 'Tap + to add your first class link.'));
@@ -774,14 +762,15 @@ function renderSearch(q) {
 // ═══════════════════════════════════════════════════
 // TOPIC ITEM  (fixed portal menu)
 // ═══════════════════════════════════════════════════
-let openMenuBtn = null;
+let openMenuEl = null;   // currently open .menu-content element
 
 function closeAllMenus() {
-  const portal = document.getElementById('topic-menu-portal');
-  if (portal) portal.innerHTML = '';
-  if (openMenuBtn) {
-    openMenuBtn.setAttribute('aria-expanded', 'false');
-    openMenuBtn = null;
+  if (openMenuEl) {
+    openMenuEl.classList.remove('open');
+    openMenuEl.setAttribute('aria-hidden', 'true');
+    const btn = openMenuEl.previousElementSibling;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    openMenuEl = null;
   }
 }
 
@@ -791,6 +780,8 @@ function makeTopicItem(t, subject, paper, idx) {
   item.dataset.id = t.id;
   item.draggable  = true;
 
+  // Menu-content stays IN the DOM tree (reliable event propagation).
+  // We apply position:fixed on open so it escapes any overflow clipping.
   item.innerHTML = `
     <span class="drag-handle" aria-hidden="true">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -806,8 +797,7 @@ function makeTopicItem(t, subject, paper, idx) {
     <a class="topic-link" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open link">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-        <polyline points="15 3 21 3 21 9"/>
-        <line x1="10" y1="14" x2="21" y2="3"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
       </svg>
       Open
     </a>
@@ -819,65 +809,62 @@ function makeTopicItem(t, subject, paper, idx) {
           <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
       </button>
+      <div class="menu-content" role="menu" aria-hidden="true">
+        <button class="menu-item edit-btn" role="menuitem">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>Edit
+        </button>
+        <button class="menu-item danger delete-btn" role="menuitem">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
+          </svg>Delete
+        </button>
+      </div>
     </div>`;
 
-  const menuBtn = item.querySelector('.menu-btn');
+  const menuBtn     = item.querySelector('.menu-btn');
+  const menuContent = item.querySelector('.menu-content');
 
-  function openPortalMenu() {
+  function openMenu() {
     closeAllMenus();
-    const portal = document.getElementById('topic-menu-portal');
-    if (!portal) return;
-
     const rect       = menuBtn.getBoundingClientRect();
-    const menuHeight = 94;
+    const menuHeight = 90;
     const top        = (rect.bottom + menuHeight > window.innerHeight)
-      ? rect.top - menuHeight
-      : rect.bottom + 6;
-
-    const menu = document.createElement('div');
-    menu.className = 'menu-content open portal-menu';
-    menu.setAttribute('role', 'menu');
-    menu.style.cssText = `pointer-events:auto;position:fixed;top:${top}px;right:${window.innerWidth - rect.right}px;`;
-    menu.innerHTML = `
-      <button class="menu-item edit-btn" role="menuitem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>Edit
-      </button>
-      <button class="menu-item danger delete-btn" role="menuitem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6l-1 14H6L5 6"/>
-          <path d="M9 6V4h6v2"/>
-        </svg>Delete
-      </button>`;
-
-    menu.querySelector('.edit-btn').onclick = e => {
-      e.stopPropagation(); closeAllMenus(); openTopicModal(t);
-    };
-    menu.querySelector('.delete-btn').onclick = e => {
-      e.stopPropagation(); closeAllMenus();
-      confirmAction(`Delete topic "${t.title}"?`, async () => {
-        const arr = paper
-          ? state.data.subjects[subject].papers[paper]
-          : state.data.subjects[subject].topics;
-        const i = arr.findIndex(x => x.id === t.id);
-        if (i !== -1) arr.splice(i, 1);
-        await save();
-        paper ? renderTopics(subject, paper) : renderDirectTopics(subject);
-        showToast(`"${t.title}" deleted`, 'info');
-      });
-    };
-
-    portal.appendChild(menu);
+      ? rect.top - menuHeight : rect.bottom + 6;
+    menuContent.style.cssText = `position:fixed;top:${top}px;right:${window.innerWidth - rect.right}px;left:auto;z-index:9999;`;
+    menuContent.classList.add('open');
+    menuContent.setAttribute('aria-hidden', 'false');
     menuBtn.setAttribute('aria-expanded', 'true');
-    openMenuBtn = menuBtn;
+    openMenuEl = menuContent;
   }
 
   menuBtn.addEventListener('click', e => {
     e.stopPropagation();
-    openMenuBtn === menuBtn ? closeAllMenus() : openPortalMenu();
+    openMenuEl === menuContent ? closeAllMenus() : openMenu();
+  });
+
+  menuContent.querySelector('.edit-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    closeAllMenus();
+    openTopicModal(t);
+  });
+
+  menuContent.querySelector('.delete-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    closeAllMenus();
+    confirmAction(`Delete topic "${t.title}"?`, async () => {
+      const arr = paper
+        ? state.data.subjects[subject].papers[paper]
+        : state.data.subjects[subject].topics;
+      const i = arr.findIndex(x => x.id === t.id);
+      if (i !== -1) arr.splice(i, 1);
+      await save();
+      paper ? renderTopics(subject, paper) : renderDirectTopics(subject);
+      showToast(`"${t.title}" deleted`, 'info');
+    });
   });
 
   item.addEventListener('click', e => {
@@ -885,7 +872,6 @@ function makeTopicItem(t, subject, paper, idx) {
     window.open(t.url, '_blank', 'noopener,noreferrer');
   });
 
-  // Drag & drop
   item.addEventListener('dragstart', e => {
     state.dragSrc = t.id;
     e.dataTransfer.effectAllowed = 'move';
@@ -919,6 +905,7 @@ function makeTopicItem(t, subject, paper, idx) {
 
   return item;
 }
+
 
 // ═══════════════════════════════════════════════════
 // MODALS
@@ -1208,8 +1195,7 @@ function wireEvents() {
   document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
   document.getElementById('guestBtn')?.addEventListener('click', () => {
     document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('app').style.display        = 'block';
-    updateUserUI(null); renderSubjects();
+    // already rendered from localStorage in init(), nothing else needed
   });
   document.getElementById('signInFromApp')?.addEventListener('click', () => {
     dropdown?.classList.remove('open'); signInWithGoogle();
@@ -1326,34 +1312,37 @@ function init() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
   wireEvents();
 
-  // Load data synchronously from localStorage (no await, no CDN, always works)
+  // ── Step 1: Load & render from localStorage INSTANTLY (synchronous) ──
+  // App is visible and fully usable before any network request.
   state.data = loadData();
-
-  // Save sample data if it was freshly generated
   storageSave(state.data);
 
   if (firebaseReady() && auth) {
-    document.getElementById('authScreen').style.display = 'flex';
+    // Show app immediately with local data — no auth screen delay
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('app').style.display        = 'block';
+    updateUserUI(null);
+    renderSubjects();  // render local data right away
 
+    // ── Step 2: Resolve auth state in background ──
     onAuthStateChanged(auth, async user => {
       currentUser = user;
       if (user) {
-        document.getElementById('authScreen').style.display = 'none';
-        document.getElementById('app').style.display        = 'block';
         updateUserUI(user);
+        // Pull from Firestore silently — loading bar shows, no full-screen block
         showLoading(true);
-        await pullFromFirestore();
+        await pullFromFirestore();  // updates state.data + re-renders if cloud differs
         subscribeFirestore();
         showLoading(false);
-        renderSubjects();
-        showToast(`Welcome, ${user.displayName?.split(' ')[0] || 'User'}!`, 'success');
+        showToast(`Welcome back, ${user.displayName?.split(' ')[0] || 'User'}!`, 'success');
       } else {
-        document.getElementById('authScreen').style.display = 'flex';
-        document.getElementById('app').style.display        = 'none';
+        // Not signed in — local data already showing, just update user UI
+        updateUserUI(null);
+        setSyncState('offline');
       }
     });
   } else {
-    // Offline-only mode — no Firebase config provided
+    // Offline-only mode — no Firebase config
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('app').style.display        = 'block';
     updateUserUI(null);
@@ -1361,5 +1350,4 @@ function init() {
   }
 }
 
-// Run immediately — no async needed since localStorage is synchronous
 init();
