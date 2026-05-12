@@ -1,8 +1,18 @@
-const CACHE = 'studyvault-v1';
-const ASSETS = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json'];
+// StudyVault Service Worker
+// Uses relative paths so it works under any subdirectory (GitHub Pages, Netlify, etc.)
+const CACHE = 'studyvault-v2';
+const ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './manifest.json'
+];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(err => console.warn('SW cache failed:', err))
+  );
   self.skipWaiting();
 });
 
@@ -17,24 +27,34 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // For Firebase/CDN requests, go network-first
   const url = e.request.url;
-  if (url.includes('firebasejs') || url.includes('googleapis') || url.includes('gstatic') || url.includes('googleapis')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-    return;
+
+  // Never intercept: Firebase, Google APIs, blob URLs, chrome-extension
+  if (
+    url.includes('firebasejs') ||
+    url.includes('googleapis') ||
+    url.includes('gstatic') ||
+    url.startsWith('blob:') ||
+    url.startsWith('chrome-extension:')
+  ) {
+    return; // let browser handle it natively — critical for export downloads
   }
-  // App shell: cache-first
+
+  // App shell: cache-first, fallback to network, fallback to index.html
   e.respondWith(
-    caches.match(e.request).then(cached =>
-      cached || fetch(e.request).then(res => {
-        if (res && res.status === 200) {
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res && res.status === 200 && res.type !== 'opaque') {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      })
-    ).catch(() => {
-      if (e.request.destination === 'document') return caches.match('/index.html');
+      });
+    }).catch(() => {
+      if (e.request.destination === 'document') {
+        return caches.match('./index.html');
+      }
     })
   );
 });
