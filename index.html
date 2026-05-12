@@ -262,13 +262,36 @@
 
   <!-- Main app (ES module for Firebase) -->
   <script type="module" src="script.js"></script>
-  <!-- Service Worker -->
+ <!-- Service Worker -->
   <script>
+    // Service Worker registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW:', err));
+        navigator.serviceWorker
+          .register('./sw.js', { scope: './' })
+          .then(reg => {
+            console.log('[SW] Registered, scope:', reg.scope);
+          })
+          .catch(err => console.warn('[SW] Registration failed:', err));
       });
     }
+
+    // Handle manifest shortcut URL params
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      if (action === 'add-subject') {
+        setTimeout(() => {
+          const fab = document.getElementById('fabBtn');
+          if (fab) fab.click();
+        }, 500);
+      } else if (action === 'export') {
+        setTimeout(() => {
+          const btn = document.getElementById('exportBtn');
+          if (btn) btn.click();
+        }, 500);
+      }
+    });
   </script>
 </body>
 </html>
