@@ -68,7 +68,6 @@
         </button>
         <div class="title-wrap">
           <div id="pageTitle" class="page-title">StudyVault</div>
-          <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
         </div>
       </div>
 
@@ -205,9 +204,13 @@
     </div>
   </div>
 
+  <!-- Topic menu portal (renders above everything, avoids overflow clipping) -->
+  <!-- No pointer-events:none here — children need to receive clicks -->
+  <div id="topic-menu-portal" style="position:fixed;z-index:9999;top:0;left:0;"></div>
+
   <!-- Add/Edit Subject Modal -->
   <div id="subjectModal" class="modal-overlay" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">
       <div class="modal-header">
         <h2 id="subjectModalTitle" class="modal-title">Add Subject</h2>
         <button class="icon-btn modal-close" data-modal="subjectModal" aria-label="Close dialog">
@@ -218,6 +221,16 @@
         <label for="subjectName">Subject Name</label>
         <input type="text" id="subjectName" placeholder="e.g. Physics" autocomplete="off" maxlength="60"/>
         <span id="subjectNameError" class="error-msg" role="alert"></span>
+      </div>
+      <div class="field-group">
+        <label>Choose Icon &amp; Color</label>
+        <div id="iconPicker" class="icon-picker" role="radiogroup" aria-label="Subject icon"></div>
+      </div>
+      <div class="field-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="subjectDirect" style="accent-color:var(--accent);width:16px;height:16px"/>
+          <span>Direct topic list <span style="color:var(--text3);font-weight:400">(no papers, like ICT)</span></span>
+        </label>
       </div>
       <div class="modal-actions">
         <button id="cancelSubjectBtn" class="btn secondary">Cancel</button>
@@ -247,8 +260,6 @@
     </div>
   </div>
 
-  <!-- localForage CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
   <!-- Main app (ES module for Firebase) -->
   <script type="module" src="script.js"></script>
   <!-- Service Worker -->
