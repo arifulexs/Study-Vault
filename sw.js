@@ -1,60 +1,116 @@
-// StudyVault Service Worker
-// Uses relative paths so it works under any subdirectory (GitHub Pages, Netlify, etc.)
-const CACHE = 'studyvault-v2';
-const ASSETS = [
+// ═══════════════════════════════════════════════════
+// StudyVault — Service Worker
+// Relative paths for GitHub Pages subdirectory support
+// ═══════════════════════════════════════════════════
+
+const CACHE_NAME    = 'studyvault-v3';
+const OFFLINE_URL   = './index.html';
+const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
   './script.js',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(err => console.warn('SW cache failed:', err))
+// ── INSTALL: pre-cache all static assets ──────────
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(err => {
+        console.warn('[SW] Install cache failed:', err);
+        // Still skip waiting even if some assets fail
+        return self.skipWaiting();
+      })
   );
-  self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+// ── ACTIVATE: clean up old caches ────────────────
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  const url = e.request.url;
+// ── FETCH: smart caching strategy ─────────────────
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = request.url;
 
-  // Never intercept: Firebase, Google APIs, blob URLs, chrome-extension
+  // Only handle GET requests
+  if (request.method !== 'GET') return;
+
+  // Never intercept — let browser handle natively:
+  // blob: URLs (file export/download), Firebase, Google APIs, extensions
   if (
-    url.includes('firebasejs') ||
-    url.includes('googleapis') ||
-    url.includes('gstatic') ||
-    url.startsWith('blob:') ||
-    url.startsWith('chrome-extension:')
+    url.startsWith('blob:')           ||
+    url.startsWith('data:')           ||
+    url.startsWith('chrome-extension') ||
+    url.includes('firebasejs')        ||
+    url.includes('googleapis.com')    ||
+    url.includes('gstatic.com')       ||
+    url.includes('firebaseapp.com')
   ) {
-    return; // let browser handle it natively — critical for export downloads
+    return;
   }
 
-  // App shell: cache-first, fallback to network, fallback to index.html
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type !== 'opaque') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+  // For navigation requests (HTML pages) — network first, fallback to cache
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          // Cache the fresh response
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(OFFLINE_URL))
+    );
+    return;
+  }
+
+  // For static assets (CSS, JS, images) — cache first, fallback to network
+  event.respondWith(
+    caches.match(request)
+      .then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
+          if (response && response.status === 200 && response.type !== 'opaque') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
+          return response;
+        });
+      })
+      .catch(() => {
+        // Fallback for document requests
+        if (request.destination === 'document') {
+          return caches.match(OFFLINE_URL);
         }
-        return res;
-      });
-    }).catch(() => {
-      if (e.request.destination === 'document') {
-        return caches.match('./index.html');
-      }
+      })
+  );
+});
+
+// ── PUSH NOTIFICATIONS (future use) ──────────────
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'StudyVault', {
+      body: data.body || 'You have a new notification',
+      icon: './icon-192.png',
+      badge: './icon-192.png'
     })
   );
 });
