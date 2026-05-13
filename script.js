@@ -762,7 +762,22 @@ function renderSearch(q) {
 // ═══════════════════════════════════════════════════
 // TOPIC ITEM  (fixed portal menu)
 // ═══════════════════════════════════════════════════
-let openMenuEl = null;   // currently open .menu-content element
+// Open external URL — forces system browser in TWA to avoid Cloudflare 1101 errors
+function openExternalUrl(url) {
+  try {
+    // Android TWA: use intent URL to force open in system Chrome, not WebView
+    if (/Android/i.test(navigator.userAgent)) {
+      const scheme  = url.startsWith('https') ? 'https' : 'http';
+      const bare    = url.replace(/^https?:\/\//, '');
+      const intent  = `intent://${bare}#Intent;scheme=${scheme};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+      window.location.href = intent;
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  } catch (e) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
 
 function closeAllMenus() {
   if (openMenuEl) {
@@ -794,13 +809,13 @@ function makeTopicItem(t, subject, paper, idx) {
       </svg>
     </span>
     <span class="topic-label" title="${esc(t.title)}">${esc(t.title)}</span>
-    <a class="topic-link" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open link">
+    <button class="topic-link" onclick="openExternalUrl('${esc(t.url)}')" aria-label="Open link">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
         <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
       </svg>
       Open
-    </a>
+    </button>
     <div class="topic-menu">
       <button class="menu-btn" aria-label="Topic options" aria-haspopup="true" aria-expanded="false">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -868,8 +883,8 @@ function makeTopicItem(t, subject, paper, idx) {
   });
 
   item.addEventListener('click', e => {
-    if (e.target.closest('a, .topic-menu, .drag-handle')) return;
-    window.open(t.url, '_blank', 'noopener,noreferrer');
+    if (e.target.closest('button.topic-link, .topic-menu, .drag-handle')) return;
+    openExternalUrl(t.url);
   });
 
   item.addEventListener('dragstart', e => {
